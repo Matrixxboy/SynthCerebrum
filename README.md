@@ -22,27 +22,30 @@ Here’s a **step-by-step plan**:
 ### **Tables**
 
 1. **files** – Track file metadata
-   \| Column        | Type        | Description |
-   \|---------------|------------|-------------|
-   \| id            | INTEGER PK | Unique file ID |
-   \| path          | TEXT       | Full file path |
-   \| filename      | TEXT       | File name |
-   \| last\_modified | DATETIME   | File last modified |
-   \| processed     | BOOLEAN    | If file is already chunked |
+   
+   | Column        | Type        | Description |
+   |---------------|------------|-------------|
+   | id            | INTEGER PK | Unique file ID |
+   | path          | TEXT       | Full file path |
+   | filename      | TEXT       | File name |
+   | last\_modified | DATETIME   | File last modified |
+   | processed     | BOOLEAN    | If file is already chunked |
 
-2. **chunks** – Store text chunks
-   \| Column   | Type        | Description |
-   \|----------|------------|-------------|
-   \| id       | INTEGER PK | Unique chunk ID |
-   \| file\_id  | INTEGER FK | File it belongs to |
-   \| chunk    | TEXT       | Text content |
-   \| chunk\_num| INTEGER    | Chunk order in file |
+3. **chunks** – Store text chunks
 
-3. **embeddings (optional)** – For future RAG
-   \| Column   | Type        | Description |
-   \|----------|------------|-------------|
-   \| id       | INTEGER PK | Chunk ID reference |
-   \| vector   | BLOB       | Embedding vector (for AI retrieval) |
+   | Column   | Type        | Description |
+   |----------|------------|-------------|
+   | id       | INTEGER PK | Unique chunk ID |
+   | file\_id  | INTEGER FK | File it belongs to |
+   | chunk    | TEXT       | Text content |
+   | chunk\_num| INTEGER    | Chunk order in file |
+
+5. **embeddings (optional)** – For future RAG
+
+   | Column   | Type        | Description |
+   |----------|------------|-------------|
+   | id       | INTEGER PK | Chunk ID reference |
+   | vector   | BLOB       | Embedding vector (for AI retrieval) |
 
 ---
 
@@ -153,7 +156,3 @@ def process_folder(folder_path):
 This **mini project** gives you a **working offline AI-ready pipeline**: folder → chunks → SQL → ready for AI retrieval.
 
 ---
-
-If you want, I can **write the next version** where we **add embeddings + RAG + Ollama integration**, keeping all SQL storage intact.
-
-Do you want me to do that next?
