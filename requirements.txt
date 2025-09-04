@@ -1,0 +1,5 @@
+ollama
+mysql-connector-python
+numpy
+PyPDF2
+python-docx
