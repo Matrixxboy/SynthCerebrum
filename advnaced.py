@@ -265,8 +265,11 @@ def update_vector_store(file_path):
         # Split into chunks (your file will probably stay as 1 chunk)
         chunks = text_splitter.split_text(content)
 
+        # Create metadata for each chunk
+        metadatas = [{"source": file_path} for _ in chunks]
+
         # Instead of creating a new FAISS each time, just add directly
-        db.add_texts(chunks, embedder)
+        db.add_texts(chunks, metadatas=metadatas)
 
         # Save updated index
         db.save_local(INDEX_PATH)
