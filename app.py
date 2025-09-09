@@ -3,7 +3,7 @@ import logging
 import threading
 from src.database import init_mysql_database, save_interaction
 from src.models import initialize_models
-from src.indexing import initial_scan_and_index, save_index
+from src.indexing import initial_scan_and_index, save_index, force_reindex
 from src.rag import answer_query, add_user_knowledge
 from src.file_watcher import start_file_watcher_background
 
@@ -13,8 +13,8 @@ load_dotenv()
 # ---------------- CONFIG ----------------
 KNOWLEDGE_DIR = "./knowledge"
 INDEX_PATH = "faiss_index"
-LLM_MODEL_NAME = "philschmid/flan-t5-base-samsum"         # or any other local model
-EMBEDDING_MODEL_NAME = "sentence-transformers/paraphrase-MiniLM-L3-v2"  # smaller and faster
+LLM_MODEL_NAME = "QuantFactory--Meta-Llama-3-8B-Instruct-GGUF/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"         
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
 MYSQL_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
     "user": os.getenv("DB_USER", "root"),
@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def interactive_loop():
     print("\n--- Offline RAG System ---")
-    print("Commands: 'exit', 'watch' (start watcher), 'add' (add new knowledge), 'save' (save index), or type a question.")
+    print("Commands: 'exit', 'watch' (start watcher), 'add' (add new knowledge), 'save' (save index), 'reindex' (force re-index), or type a question.")
     while True:
         try:
             q = input("\nYour input: ").strip()
@@ -44,6 +44,11 @@ def interactive_loop():
             continue
         if q.lower() == "save":
             save_index(INDEX_PATH)
+            continue
+        if q.lower() == "reindex":
+            force_reindex(INDEX_PATH)
+            initial_scan_and_index(KNOWLEDGE_DIR, INDEX_PATH)
+            continue
             continue
 
         if q.lower().startswith("add"):

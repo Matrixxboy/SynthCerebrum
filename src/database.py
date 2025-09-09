@@ -3,11 +3,11 @@ import json
 from getpass import getpass
 from typing import List, Optional
 
+from typing import Optional
 import mysql.connector
-from mysql.connector import errorcode
 
-# MySQL connection (will be set in init_db())
-mysql_conn: Optional[mysql.connector.connection_cext.CMySQLConnection] = None
+mysql_conn: Optional[mysql.connector.connection.MySQLConnection] = None
+
 
 def init_mysql_database(cfg: dict):
     """

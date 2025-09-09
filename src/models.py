@@ -1,79 +1,79 @@
+# src/models.py
 import os
 import logging
-import torch
 from pathlib import Path
 from typing import Optional
-from transformers import (
-    pipeline,
-    AutoTokenizer,
-    AutoConfig,
-    AutoModelForSeq2SeqLM,
-    AutoModelForCausalLM,
-)
+
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.llms import LlamaCpp
 
-# Globals
+# Globals to hold the initialized models and objects
 db: Optional[FAISS] = None
-llm = None
+llm: Optional[LlamaCpp] = None
 embedder: Optional[HuggingFaceEmbeddings] = None
 text_splitter: Optional[RecursiveCharacterTextSplitter] = None
-llm_is_seq2seq: bool = False
-llm_pipeline_task: str = "text2text-generation"
 
-def initialize_models(llm_model_name, embedding_model_name, index_path):
-    """Load embedder, load or create FAISS, load LLM pipeline, and setup text splitter."""
-    global db, llm, embedder, text_splitter, llm_is_seq2seq, llm_pipeline_task
 
-    logging.info("Initializing embedder and text splitter...")
-    embedder = HuggingFaceEmbeddings(model_name=embedding_model_name)
+def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, index_path: str):
+    """
+    Initialize embeddings, FAISS index, LLM, and text splitter.
+    This function should only be called once.
+    """
+    global db, llm, embedder, text_splitter
+
+    # 1. Initialize Embedder
+    logging.info(f"Initializing embedding model: {embedding_model_name}")
+    try:
+        embedder = HuggingFaceEmbeddings(model_name=embedding_model_name)
+    except Exception as e:
+        logging.error(f"Failed to load embedding model: {e}")
+        raise  # Stop execution if embeddings can't load
+
+    # 2. Initialize Text Splitter
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
 
-    logging.info("Loading FAISS index if exists...")
+    # 3. Load FAISS Index from disk if it exists
+    logging.info(f"Looking for FAISS index at: {index_path}")
     if os.path.exists(index_path):
         try:
-            db = FAISS.load_local(index_path, embedder, allow_dangerous_deserialization=True)
-            logging.info("Loaded FAISS index from disk.")
-        except Exception:
-            logging.exception("Failed to load FAISS index. A new index will be created when indexing content.")
+            # Note: allow_dangerous_deserialization is needed for FAISS with pickle.
+            # Only load index files from trusted sources.
+            db = FAISS.load_local(
+                index_path, 
+                embedder, 
+                allow_dangerous_deserialization=True
+            )
+            logging.info("Successfully loaded FAISS index from disk.")
+        except Exception as e:
+            logging.warning(f"Failed to load FAISS index: {e}. A new index will be created.")
             db = None
     else:
         db = None
-        logging.info("No FAISS index on disk yet.")
+        logging.info("No FAISS index found. A new one will be created upon scanning knowledge files.")
 
-    # ---------------- LOCAL MODEL LOADING ----------------
-    # Always look for models inside ./models/<model-name>
-    local_model_path = Path("./models") / llm_model_name.replace("/", "--")
-    if local_model_path.exists():
-        logging.info(f"Loading model from local path: {local_model_path}")
-        config = AutoConfig.from_pretrained(local_model_path)
-        tokenizer = AutoTokenizer.from_pretrained(local_model_path)
-        if getattr(config, "is_encoder_decoder", False):
-            llm_is_seq2seq = True
-            model = AutoModelForSeq2SeqLM.from_pretrained(local_model_path, device_map="auto", dtype=torch.float16)
-            llm_pipeline_task = "text2text-generation"
-        else:
-            llm_is_seq2seq = False
-            model = AutoModelForCausalLM.from_pretrained(local_model_path, device_map="auto", dtype=torch.float16)
-            llm_pipeline_task = "text-generation"
+    # 4. Load GGUF LLM
+    gguf_model_file = Path(llm_model_path)
+    if not gguf_model_file.exists():
+        logging.error(f"LLM model file not found at {gguf_model_file}")
+        # Create a placeholder to guide the user
+        placeholder = gguf_model_file.parent / "DOWNLOAD_MODEL_HERE.txt"
+        gguf_model_file.parent.mkdir(parents=True, exist_ok=True)
+        placeholder.write_text(f"Download the GGUF model '{gguf_model_file.name}' and place it in this directory.")
+        llm = None
     else:
-        logging.info(f"Local model path not found, downloading from HuggingFace: {llm_model_name}")
-        config = AutoConfig.from_pretrained(llm_model_name)
-        tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
-        if getattr(config, "is_encoder_decoder", False):
-            llm_is_seq2seq = True
-            model = AutoModelForSeq2SeqLM.from_pretrained(llm_model_name, device_map="auto", dtype=torch.float16)
-            llm_pipeline_task = "text2text-generation"
-        else:
-            llm_is_seq2seq = False
-            model = AutoModelForCausalLM.from_pretrained(llm_model_name, device_map="auto", dtype=torch.float16)
-            llm_pipeline_task = "text-generation"
-        # Save locally for future use
-        Path(local_model_path).mkdir(parents=True, exist_ok=True)
-        model.save_pretrained(local_model_path)
-        tokenizer.save_pretrained(local_model_path)
-        config.save_pretrained(local_model_path)
-
-    llm = pipeline(llm_pipeline_task, model=model, tokenizer=tokenizer, max_new_tokens=256)
-    logging.info(f"LLM pipeline ready ({llm_pipeline_task}).")
+        try:
+            logging.info(f"Loading GGUF model from: {gguf_model_file}")
+            llm = LlamaCpp(
+                model_path=str(gguf_model_file),
+                n_gpu_layers=-1,      # Offload all possible layers to GPU
+                n_batch=512,          # Batch size for prompt processing
+                n_ctx=2048,           # The context window size
+                f16_kv=True,          # Use half-precision for KV cache, saves VRAM
+                verbose=False,        # Set to True for detailed LlamaCpp logging
+            )
+            logging.info("LLM loaded successfully.")
+        except Exception as e:
+            logging.error(f"Failed to load LLM: {e}")
+            llm = None
