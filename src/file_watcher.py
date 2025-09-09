@@ -11,12 +11,12 @@ class KnowledgeFolderHandler(FileSystemEventHandler):
         self.index_path = index_path
 
     def on_created(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(".txt"):
+        if not event.is_directory:
             logging.info(f"Detected new file: {event.src_path}")
             update_vector_store(event.src_path, self.index_path)
 
     def on_modified(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(".txt"):
+        if not event.is_directory:
             logging.info(f"Detected modified file: {event.src_path}")
             update_vector_store(event.src_path, self.index_path)
 

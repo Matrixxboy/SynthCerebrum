@@ -3,6 +3,10 @@ import logging
 from pathlib import Path
 import threading
 from typing import List
+import csv
+from PyPDF2 import PdfReader
+import pandas as pd
+import docx
 
 from langchain_community.vectorstores import FAISS
 
@@ -47,17 +51,43 @@ def save_index(index_path):
             models.db.save_local(index_path)
             logging.info(f"FAISS index saved to {index_path}")
 
+def _read_file_content(file_path):
+    """Reads content from a file, supporting different file types."""
+    content = ""
+    try:
+        if file_path.endswith(".pdf"):
+            with open(file_path, "rb") as f:
+                reader = PdfReader(f)
+                for page in reader.pages:
+                    content += page.extract_text() or ""
+        elif file_path.endswith(".csv"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    content += ", ".join(row) + "\n"
+        elif file_path.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file_path)
+            content = df.to_string()
+        elif file_path.endswith(('.doc', '.docx')):
+            doc = docx.Document(file_path)
+            for para in doc.paragraphs:
+                content += para.text + '\n'
+        else:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+    except Exception as e:
+        logging.error(f"Failed to read file {file_path}: {e}")
+    return content
 
 def update_vector_store(file_path, index_path):
     """Reads a file, splits it into chunks, embeds them, and adds to FAISS."""
     _create_or_get_db() # Ensure db is initialized
     try:
         logging.info(f"Processing and indexing file: {file_path}")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        content = _read_file_content(file_path)
 
         if not content.strip():
-            logging.warning(f"File {file_path} is empty. Skipping.")
+            logging.warning(f"File {file_path} is empty or could not be read. Skipping.")
             return
 
         # Split into chunks (your file will probably stay as 1 chunk)
@@ -79,10 +109,10 @@ def update_vector_store(file_path, index_path):
 
 def initial_scan_and_index(knowledge_dir, index_path):
     _ensure_dirs(knowledge_dir)
-    logging.info(f"Scanning {knowledge_dir} for .txt files...")
+    logging.info(f"Scanning {knowledge_dir} for files...")
     found = False
     for f in Path(knowledge_dir).iterdir():
-        if f.is_file() and f.suffix.lower() == ".txt":
+        if f.is_file():
             update_vector_store(str(f), index_path)
             found = True
     if not found:
