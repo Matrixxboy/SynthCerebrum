@@ -11,7 +11,9 @@ from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
     CSVLoader,
-    UnstructuredMarkdownLoader
+    UnstructuredMarkdownLoader,
+    Docx2txtLoader,
+    UnstructuredExcelLoader
 )
 
 from src import models
@@ -21,16 +23,53 @@ db_lock = threading.Lock()
 
 # Supported file types and their loaders
 LOADER_MAPPING = {
+    # Text-based
     ".txt": TextLoader,
     ".md": UnstructuredMarkdownLoader,
-    ".pdf": PyPDFLoader,
     ".csv": CSVLoader,
+    
+    # Office Documents
+    ".pdf": PyPDFLoader,
+    ".docx": Docx2txtLoader,
+    ".xlsx": UnstructuredExcelLoader,
+    ".xls": UnstructuredExcelLoader,
+
+    # Programming Languages (all treated as plain text)
+    ".py": TextLoader, 
+    ".js": TextLoader,
+    ".java": TextLoader,
+    ".c": TextLoader,
+    ".cpp": TextLoader,
+    ".h": TextLoader,
+    ".hpp": TextLoader,
+    ".cs": TextLoader,
+    ".go": TextLoader,
+    ".rs": TextLoader,
+    ".ts": TextLoader,
+    ".rb": TextLoader,
+    ".php": TextLoader,
+    ".kt": TextLoader,
+    ".swift": TextLoader,
+    ".scala": TextLoader,
+    ".lua": TextLoader,
+    ".pl": TextLoader,
+    ".sh": TextLoader,
+    ".bat": TextLoader,
+    ".sql": TextLoader,
+    ".html": TextLoader,
+    ".css": TextLoader,
+    ".xml": TextLoader,
+    ".json": TextLoader,
+    ".yaml": TextLoader,
+    ".yml": TextLoader,
+    ".ini": TextLoader,
+    ".cfg": TextLoader,
+    ".toml": TextLoader,
 }
 
 def _ensure_dirs(path_str: str):
     """Ensure the directory for a given path exists."""
     Path(path_str).parent.mkdir(parents=True, exist_ok=True)
-
 
 def force_reindex(index_path: str):
     """Deletes the existing FAISS index directory."""
@@ -40,7 +79,6 @@ def force_reindex(index_path: str):
             shutil.rmtree(index_path)
         models.db = None # Clear the in-memory index
 
-
 def save_index(index_path: str):
     """Saves the current in-memory FAISS index to disk."""
     with db_lock:
@@ -49,7 +87,6 @@ def save_index(index_path: str):
             models.db.save_local(index_path)
         else:
             logging.warning("No index in memory to save.")
-
 
 def _load_documents_from_files(file_paths: List[str]) -> List[Document]:
     """Loads and splits documents from a list of file paths."""
@@ -73,7 +110,6 @@ def _load_documents_from_files(file_paths: List[str]) -> List[Document]:
         return []
 
     return models.text_splitter.split_documents(docs)
-
 
 def update_vector_store(file_paths: List[str], index_path: str):
     """
@@ -102,7 +138,6 @@ def update_vector_store(file_paths: List[str], index_path: str):
     
     # Save the updated index automatically
     save_index(index_path)
-
 
 def initial_scan_and_index(knowledge_dir: str, index_path: str):
     """Scans the knowledge directory and indexes all supported files."""

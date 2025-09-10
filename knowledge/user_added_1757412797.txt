@@ -1,2 +1,0 @@
-UserCorrection Q: what is Tuberculous?
-CorrectedAnswer: Tuberculous disease in the cervical glands# is a common accompaniment or sequel of adenoids, enlarged tonsils, carious teeth, pharyngitis, middle-ear disease, and conjunctivitis. These lesions afford the bacillia chance of entry into the lymph vessels, in which they are carried to the glands, where they give rise to disease.

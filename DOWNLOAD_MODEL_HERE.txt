@@ -1,1 +1,0 @@
-Download the GGUF model 'Meta-Llama-3-8B-Instruct.Q2_K.gguf' and place it in this directory.

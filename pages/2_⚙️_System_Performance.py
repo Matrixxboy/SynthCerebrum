@@ -9,12 +9,12 @@ import torch
 st.set_page_config(page_title="System Performance", page_icon="⚙️", layout="wide")
 st.title("⚙️ System Performance Monitor")
 
-# Retrieve config from session state
-try:
-    config = st.session_state.config
-except AttributeError:
+# Check if the main app has been run and session state is initialized
+if 'LLM_MODEL_PATH' not in st.session_state or 'EMBEDDING_MODEL_NAME' not in st.session_state:
     st.error("Configuration not loaded. Please start from the main Chat page.")
     st.stop()
+
+config = st.session_state
 
 
 # --- System Information ---

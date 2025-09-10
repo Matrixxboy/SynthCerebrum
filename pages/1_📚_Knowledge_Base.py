@@ -7,13 +7,13 @@ from src.indexing import force_reindex, initial_scan_and_index, update_vector_st
 st.set_page_config(page_title="Knowledge Base Management", page_icon="📚", layout="wide")
 st.title("📚 Knowledge Base Management")
 
-# Retrieve config from session state
-try:
-    KNOWLEDGE_DIR = st.session_state.config["KNOWLEDGE_DIR"]
-    INDEX_PATH = st.session_state.config["INDEX_PATH"]
-except AttributeError:
+# Check if the main app has been run and session state is initialized
+if 'KNOWLEDGE_DIR' not in st.session_state or 'INDEX_PATH' not in st.session_state:
     st.error("Configuration not loaded. Please start from the main Chat page.")
     st.stop()
+
+KNOWLEDGE_DIR = st.session_state.KNOWLEDGE_DIR
+INDEX_PATH = st.session_state.INDEX_PATH
 
 # --- Utility Functions ---
 def get_knowledge_files():
