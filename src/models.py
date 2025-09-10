@@ -16,7 +16,7 @@ embedder: Optional[HuggingFaceEmbeddings] = None
 text_splitter: Optional[RecursiveCharacterTextSplitter] = None
 
 
-def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, index_path: str):
+def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, index_path: str, chunk_size: int, chunk_overlap: int):
     """
     Initialize embeddings, FAISS index, LLM, and text splitter.
     This function should only be called once.
@@ -32,7 +32,8 @@ def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, 
         raise  # Stop execution if embeddings can't load
 
     # 2. Initialize Text Splitter
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    logging.info(f"Initializing text splitter with chunk_size={chunk_size} and chunk_overlap={chunk_overlap}")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
     # 3. Load FAISS Index from disk if it exists
     logging.info(f"Looking for FAISS index at: {index_path}")

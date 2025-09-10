@@ -7,15 +7,8 @@ from typing import List, Tuple, Optional
 from src import models
 from src.indexing import db_lock, update_vector_store, _ensure_dirs
 
-def _build_prompt(query: str, context: str) -> str:
+def _build_prompt(query: str, context: str, system_prompt: str) -> str:
     """Builds a structured prompt for the Llama 3 Instruct model."""
-    system_prompt = (
-        "You are an expert information extractor. Your sole task is to analyze the user's question and the provided context. "
-        "Extract the relevant information from the context and present it clearly and concisely. If the user asks for a list, provide a bulleted list. "
-        "Your answer must be based ONLY on the provided context. Do not use any external knowledge. If the context does not contain the answer, "
-        "state that you cannot answer based on the provided information."
-    )
-
     # Llama 3 Instruct models require a specific format with special tokens.
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
@@ -31,7 +24,7 @@ Question: {query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
     return prompt
 
 
-def answer_query(query: str, k: int = 4) -> Tuple[str, List[str]]:
+def answer_query(query: str, system_prompt: str, k: int = 4) -> Tuple[str, List[str]]:
     """Retrieve top-k docs, generate answer, and return (answer, sources)."""
     if not models.db:
         logging.warning("FAISS index not loaded or empty.")
@@ -47,11 +40,12 @@ def answer_query(query: str, k: int = 4) -> Tuple[str, List[str]]:
     context = "\n\n".join(d.page_content for d in docs)
     # Use a set to get unique sources, then convert back to a list
     sources = list(set(d.metadata.get("source", "Unknown") for d in docs))
-    prompt = _build_prompt(query, context)
+    prompt = _build_prompt(query, context, system_prompt)
 
     if not models.llm:
         logging.warning("LLM not loaded. Cannot generate answer.")
         return "The language model is not available, so I cannot generate an answer.", sources
+
 
     logging.info("Calling LLM to generate answer...")
     try:

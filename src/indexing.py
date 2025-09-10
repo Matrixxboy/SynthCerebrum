@@ -18,8 +18,8 @@ from langchain_community.document_loaders import (
 
 from src import models
 
-# A lock to prevent simultaneous read/write operations on the index
-db_lock = threading.Lock()
+# A re-entrant lock to prevent deadlocks when a locked function calls another locked function.
+db_lock = threading.RLock()
 
 # Supported file types and their loaders
 LOADER_MAPPING = {
@@ -128,16 +128,30 @@ def update_vector_store(file_paths: List[str], index_path: str):
     logging.info(f"Embedding and indexing {len(split_docs)} new document chunks...")
     with db_lock:
         if models.db is None:
-            # Create a new index
+            # Create a new index from scratch
             models.db = models.FAISS.from_documents(split_docs, models.embedder)
             logging.info("Created a new FAISS index.")
         else:
-            # Add to the existing index
+            # Add new documents to the existing index
             models.db.add_documents(split_docs)
             logging.info("Updated existing FAISS index.")
-    
-    # Save the updated index automatically
-    save_index(index_path)
+        
+        # Save the potentially updated index to disk
+        save_index(index_path)
+
+        # Crucial step: Reload the index from disk to ensure consistency
+        try:
+            logging.info("Reloading FAISS index from disk to ensure consistency.")
+            models.db = models.FAISS.load_local(
+                index_path, 
+                models.embedder, 
+                allow_dangerous_deserialization=True
+            )
+        except Exception as e:
+            logging.error(f"FATAL: Failed to reload index from disk after update: {e}")
+            # If reloading fails, the in-memory index might be out of sync.
+            # Clearing it to prevent incorrect answers.
+            models.db = None
 
 def initial_scan_and_index(knowledge_dir: str, index_path: str):
     """Scans the knowledge directory and indexes all supported files."""
