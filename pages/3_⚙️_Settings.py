@@ -10,6 +10,8 @@ st.warning("⚠️ Changing settings will cause the application to relaunch and 
 if st.button("Save and Relaunch Application"):
     # Update session state from the input widgets
     # The keys for widgets are used to retrieve their values
+    st.session_state.KNOWLEDGE_DIR = st.session_state.knowledge_dir_input
+    st.session_state.INDEX_PATH = st.session_state.index_path_input
     st.session_state.LLM_MODEL_PATH = st.session_state.llm_model_path_input
     st.session_state.EMBEDDING_MODEL_NAME = st.session_state.embedding_model_name_input
     st.session_state.SYSTEM_PROMPT = st.session_state.system_prompt_input
@@ -26,6 +28,21 @@ if st.button("Save and Relaunch Application"):
     st.rerun()
 
 st.divider()
+
+# --- Path Configuration ---
+st.header("Path Configuration")
+st.text_input(
+    "Knowledge Base Path", 
+    value=st.session_state.get('KNOWLEDGE_DIR', ''), 
+    key="knowledge_dir_input",
+    help="The directory containing your source documents."
+)
+st.text_input(
+    "FAISS Index Path", 
+    value=st.session_state.get('INDEX_PATH', ''), 
+    key="index_path_input",
+    help="The directory where the FAISS index will be stored."
+)
 
 # --- Model Configuration ---
 st.header("Model Configuration")
