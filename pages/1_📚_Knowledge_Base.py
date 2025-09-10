@@ -17,8 +17,11 @@ INDEX_PATH = st.session_state.INDEX_PATH
 
 # --- Utility Functions ---
 def get_knowledge_files():
-    """Returns a list of files in the knowledge directory."""
-    return [f for f in os.listdir(KNOWLEDGE_DIR) if os.path.isfile(os.path.join(KNOWLEDGE_DIR, f))]
+    """Recursively finds all files in the knowledge directory."""
+    knowledge_path = Path(KNOWLEDGE_DIR)
+    if not knowledge_path.exists():
+        knowledge_path.mkdir(parents=True)
+    return sorted([p for p in knowledge_path.rglob("*") if p.is_file()], key=os.path.getmtime, reverse=True)
 
 def handle_file_delete(file_path):
     """Deletes a file and forces a full re-index."""
@@ -29,19 +32,21 @@ def handle_file_delete(file_path):
             force_reindex(INDEX_PATH)
             initial_scan_and_index(KNOWLEDGE_DIR, INDEX_PATH)
         st.success("Re-indexing complete!")
+        st.rerun()
     except Exception as e:
         st.error(f"Error deleting file: {e}")
 
 # --- UI Layout ---
 st.header("Upload New Documents")
 uploaded_files = st.file_uploader(
-    "Add new files to your knowledge base (.txt, .md, .pdf, .csv)",
-    accept_multiple_files=True,
-    type=['txt', 'md', 'pdf', 'csv']
+    "Add new files to your knowledge base. Subdirectories are supported.",
+    accept_multiple_files=True
 )
 
 if uploaded_files:
     new_file_paths = []
+    # To preserve subdirectories, we can't use the uploader easily.
+    # For now, all uploaded files will be placed in the root of the knowledge directory.
     for uploaded_file in uploaded_files:
         file_path = os.path.join(KNOWLEDGE_DIR, uploaded_file.name)
         with open(file_path, "wb") as f:
@@ -52,10 +57,12 @@ if uploaded_files:
     with st.spinner("Indexing new documents..."):
         update_vector_store(new_file_paths, INDEX_PATH)
     st.success("Indexing complete!")
+    st.rerun()
 
+st.divider()
 
 st.header("Manage Existing Documents")
-st.markdown(f"Displaying files from: `{KNOWLEDGE_DIR}`")
+st.markdown(f"Displaying all files from: `{KNOWLEDGE_DIR}`")
 
 files = get_knowledge_files()
 
@@ -63,30 +70,34 @@ if not files:
     st.info("Your knowledge base is empty. Upload some documents to get started!")
 else:
     col1, col2, col3 = st.columns([3, 1, 1])
-    col1.subheader("File Name")
+    col1.subheader("File Path (relative)")
     col2.subheader("Size (KB)")
     col3.subheader("Actions")
     
     st.divider()
 
-    for file in files:
-        file_path = os.path.join(KNOWLEDGE_DIR, file)
-        file_size = round(os.path.getsize(file_path) / 1024, 2)
+    for file_path in files:
+        try:
+            # Display path relative to the knowledge directory
+            relative_path = file_path.relative_to(KNOWLEDGE_DIR)
+            file_size = round(file_path.stat().st_size / 1024, 2)
 
-        col1, col2, col3 = st.columns([3, 1, 1])
-        
-        with col1:
-            with st.expander(file):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        st.text(f.read())
-                except Exception:
-                    st.warning("Cannot display content for this file type (e.g., PDF).")
+            col1, col2, col3 = st.columns([3, 1, 1])
+            
+            with col1:
+                # Use an expander to show file content without taking too much space
+                with st.expander(str(relative_path)):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            st.text(f.read(1000) + ("..." if len(f.read()) > 1000 else ""))
+                    except Exception:
+                        st.warning("Cannot display preview for this file type (e.g., PDF, DOCX).")
 
-        with col2:
-            st.write(f"{file_size} KB")
+            with col2:
+                st.write(f"{file_size} KB")
 
-        with col3:
-            if st.button("🗑️ Delete", key=f"delete_{file}"):
-                handle_file_delete(file_path)
-                st.rerun()
+            with col3:
+                if st.button("🗑️ Delete", key=f"delete_{relative_path}"):
+                    handle_file_delete(file_path)
+        except Exception as e:
+            st.error(f"Error processing file {file_path.name}: {e}")
