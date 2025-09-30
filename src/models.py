@@ -16,10 +16,10 @@ embedder: Optional[HuggingFaceEmbeddings] = None
 text_splitter: Optional[RecursiveCharacterTextSplitter] = None
 
 
-def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, index_path: str, chunk_size: int, chunk_overlap: int):
+def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, index_path: str, chunk_size: int, chunk_overlap: int) -> bool:
     """
     Initialize embeddings, FAISS index, LLM, and text splitter.
-    This function should only be called once.
+    Returns True on success, False on failure.
     """
     global db, llm, embedder, text_splitter
 
@@ -29,7 +29,7 @@ def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, 
         embedder = HuggingFaceEmbeddings(model_name=embedding_model_name)
     except Exception as e:
         logging.error(f"Failed to load embedding model: {e}")
-        raise  # Stop execution if embeddings can't load
+        return False
 
     # 2. Initialize Text Splitter
     logging.info(f"Initializing text splitter with chunk_size={chunk_size} and chunk_overlap={chunk_overlap}")
@@ -39,8 +39,6 @@ def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, 
     logging.info(f"Looking for FAISS index at: {index_path}")
     if os.path.exists(index_path):
         try:
-            # Note: allow_dangerous_deserialization is needed for FAISS with pickle.
-            # Only load index files from trusted sources.
             db = FAISS.load_local(
                 index_path, 
                 embedder, 
@@ -58,23 +56,22 @@ def initialize_models_and_index(llm_model_path: str, embedding_model_name: str, 
     gguf_model_file = Path(llm_model_path)
     if not gguf_model_file.exists():
         logging.error(f"LLM model file not found at {gguf_model_file}")
-        # Create a placeholder to guide the user
-        placeholder = gguf_model_file.parent / "DOWNLOAD_MODEL_HERE.txt"
-        gguf_model_file.parent.mkdir(parents=True, exist_ok=True)
-        placeholder.write_text(f"Download the GGUF model '{gguf_model_file.name}' and place it in this directory.")
         llm = None
+        return False
     else:
         try:
             logging.info(f"Loading GGUF model from: {gguf_model_file}")
             llm = LlamaCpp(
                 model_path=str(gguf_model_file),
-                n_gpu_layers=-1,      # Offload all possible layers to GPU
-                n_batch=512,          # Batch size for prompt processing
-                n_ctx=2048,           # The context window size
-                f16_kv=True,          # Use half-precision for KV cache, saves VRAM
-                verbose=False,        # Set to True for detailed LlamaCpp logging
+                n_gpu_layers=-1,
+                n_batch=512,
+                n_ctx=2048,
+                f16_kv=True,
+                verbose=False,
             )
             logging.info("LLM loaded successfully.")
+            return True
         except Exception as e:
-            logging.error(f"Failed to load LLM: {e}")
+            logging.error(f"Failed to load LLM: {e}", exc_info=True)
             llm = None
+            return False

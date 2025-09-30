@@ -87,5 +87,16 @@
         "sources": [
             "Utsav.txt"
         ]
+    },
+    {
+        "role": "user",
+        "content": "hello how are you ?"
+    },
+    {
+        "role": "assistant",
+        "content": "The language model is not available, so I cannot generate an answer.",
+        "sources": [
+            "Unknown"
+        ]
     }
 ]

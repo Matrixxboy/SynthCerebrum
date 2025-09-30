@@ -1,0 +1,88 @@
+[
+    {
+        "role": "user",
+        "content": "hello"
+    },
+    {
+        "role": "assistant",
+        "content": "The language model is not available, so I cannot generate an answer.",
+        "sources": [
+            "knowledge\\user_added_1756986449.txt",
+            "Unknown"
+        ]
+    },
+    {
+        "role": "user",
+        "content": "hello"
+    },
+    {
+        "role": "assistant",
+        "content": "The knowledge base is not available. I cannot answer questions right now.",
+        "sources": []
+    },
+    {
+        "role": "user",
+        "content": "who is utsav ?"
+    },
+    {
+        "role": "assistant",
+        "content": "The knowledge base is not available. I cannot answer questions right now.",
+        "sources": []
+    },
+    {
+        "role": "user",
+        "content": "hello how are you ?"
+    },
+    {
+        "role": "assistant",
+        "content": "The knowledge base is not available. I cannot answer questions right now.",
+        "sources": []
+    },
+    {
+        "role": "user",
+        "content": "hello"
+    },
+    {
+        "role": "assistant",
+        "content": "The language model is not available, so I cannot generate an answer.",
+        "sources": [
+            "Unknown",
+            "knowledge\\user_added_1756986449.txt"
+        ]
+    },
+    {
+        "role": "user",
+        "content": "hello how are you ?"
+    },
+    {
+        "role": "assistant",
+        "content": "I'm an AI assistant, so I don't have emotions like humans do. However, I'm happy to help you with your question!\n\nIt seems like you're asking a casual hello-type question. If that's the case, I'll just respond with a friendly \"hello\" back!",
+        "sources": [
+            "addresses.csv",
+            "Utsav.txt"
+        ]
+    },
+    {
+        "role": "user",
+        "content": "okay  i understood"
+    },
+    {
+        "role": "assistant",
+        "content": "I'm happy to help! However, I notice that there is no question being asked. Could you please rephrase your message and ask a specific question?",
+        "sources": [
+            "addresses.csv",
+            "Utsav.txt"
+        ]
+    },
+    {
+        "role": "user",
+        "content": "hello i need your help to know the location of the john doe"
+    },
+    {
+        "role": "assistant",
+        "content": "Based on the provided context, I can tell you that John Doe is located at:\n\nAddress: 120 Jefferson St.\nLandmark: Riverside\nPIN Code: NJ\n\nI hope this information helps! Let me know if you have any other questions.",
+        "sources": [
+            "addresses.csv"
+        ]
+    }
+]

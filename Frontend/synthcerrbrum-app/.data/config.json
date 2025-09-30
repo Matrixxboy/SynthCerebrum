@@ -1,0 +1,9 @@
+{
+  "modelsDir": "E:\\Utsav\\Biz Projects\\SynthCerebrum\\Frontend\\synthcerrbrum-app\\.data\\models",
+  "dataDir": "E:\\kno",
+  "engine": {
+    "threads": 4,
+    "gpuLayers": 0,
+    "quantization": "auto"
+  }
+}

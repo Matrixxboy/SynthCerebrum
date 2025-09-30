@@ -1,0 +1,58 @@
+[
+  {
+    "id": "c8dc5bd6-386b-4d5b-8b18-b07ee49978d7",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "down",
+    "ts": 1759232137545
+  },
+  {
+    "id": "247b5f59-c03b-4149-9bd5-7adc554dc50b",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "down",
+    "ts": 1759232138425
+  },
+  {
+    "id": "2bf3ef05-6979-43fa-aa22-54035163748e",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "down",
+    "ts": 1759232138826
+  },
+  {
+    "id": "8f579ddf-74a1-47fd-a22f-e750a85a96fc",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "down",
+    "ts": 1759232138993
+  },
+  {
+    "id": "e9bc068e-a9f3-452c-a515-2e6914c7a63b",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "up",
+    "ts": 1759232139393
+  },
+  {
+    "id": "c186d204-b799-4bbd-93a8-4999206009bb",
+    "sessionId": "6f6859ab-2ae5-4f49-a615-6f9e2ccf2a83",
+    "messageId": "555170f4-7fc7-42b8-835a-4519c4a9a9a8",
+    "rating": "up",
+    "ts": 1759232164073
+  },
+  {
+    "id": "6f3100ed-8288-4524-9e57-56b418182950",
+    "sessionId": "69b11023-5f0d-464a-9c06-c9d65a659cb0",
+    "messageId": "15a1c0cb-4db4-419c-8a11-8c34838704e9",
+    "rating": "up",
+    "ts": 1759233292007
+  },
+  {
+    "id": "ba235670-6f41-4a54-9bb1-168a99df1acc",
+    "sessionId": "69b11023-5f0d-464a-9c06-c9d65a659cb0",
+    "messageId": "99a864f0-8472-4db0-8cfc-6f1f9c1eb0db",
+    "rating": "down",
+    "ts": 1759233332466
+  }
+]

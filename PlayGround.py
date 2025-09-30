@@ -137,13 +137,18 @@ def load_resources(knowledge_dir, index_path, llm_model_path, embedding_model_na
     except Exception as e:
         logging.warning(f"MySQL init failed: {e}. Continuing without database logging.")
     
-    initialize_models_and_index(
+    models_initialized = initialize_models_and_index(
         llm_model_path=llm_model_path, 
         embedding_model_name=embedding_model_name, 
         index_path=index_path,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap
     )
+    
+    if not models_initialized:
+        st.error("Failed to initialize models. The application cannot continue.")
+        st.stop()
+    
     initial_scan_and_index(knowledge_dir, index_path)
     start_file_watcher_background(knowledge_dir, index_path)
     logging.info("--- All resources initialized ---")
