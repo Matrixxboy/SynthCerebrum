@@ -23,6 +23,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<AgentWorkspace />} />
+          <Route path="/session/:id" element={<AgentWorkspace />} />
           <Route path="/rag" element={<RAGManager />} />
           <Route path="/engine" element={<EngineControl />} />
           <Route path="/feedback" element={<LearningFeedback />} />

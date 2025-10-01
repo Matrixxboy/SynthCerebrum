@@ -22,8 +22,12 @@ export default function Index() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-cyan-50 dark:from-indigo-950/30 dark:to-cyan-950/30">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold text-foreground">App updated. Visit the Agent Workspace.</h1>
-        <a href="/" className="mt-4 inline-block text-primary underline">Go to Home</a>
+        <h1 className="text-2xl font-semibold text-foreground">
+          App updated. Visit the Agent Workspace.
+        </h1>
+        <a href="/" className="mt-4 inline-block text-primary underline">
+          Go to Home
+        </a>
         <p className="mt-4 hidden max-w-md">{exampleFromServer}</p>
       </div>
     </div>

@@ -1,35 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Paperclip, Send, File, Brain, Database, Files } from "lucide-react";
-import { ingestFiles, type IngestionJob, type IngestionOptions } from "@/lib/ingestion";
+import { Paperclip, Send, File, Brain, Database, Files, X } from "lucide-react";
 import { listKnowledgeSets } from "@/lib/vectorStore";
 import { processQuery } from "@/lib/localRagEngine";
 import { ollamaGenerate } from "@/lib/api";
 import JsonRenderer from "@/components/JsonRenderer";
-import { saveSession } from "@/lib/sessions";
+import { getSession, saveSession, type ChatMessage } from "@/lib/sessions";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  structured?: unknown;
-}
+type Attachment =
+  | { name: string; content: string; type: "text" }
+  | { name: string; url: string; type: "image" };
 
 export default function AgentWorkspace() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [jobs, setJobs] = useState<IngestionJob[]>([]);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [useOllama, setUseOllama] = useState(false);
   const [useMemory, setUseMemory] = useState(true);
   const [useRag, setUseRag] = useState(true);
   const [knowledgeSet, setKnowledgeSet] = useState("default");
   const [availableSets, setAvailableSets] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(() => localStorage.getItem('current_session_id') || "");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { id: sessionId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadKnowledgeSets() {
@@ -38,51 +37,91 @@ export default function AgentWorkspace() {
     loadKnowledgeSets();
   }, []);
 
-  useEffect(()=>{
-    const handler = (e: any) => {
-      const { messageId, rating } = e.detail || {};
-      if (!messageId || !rating || !sessionId) return;
-      fetch('/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, messageId, rating }) });
-    };
-    window.addEventListener('feedback_click' as any, handler as any);
-    return () => window.removeEventListener('feedback_click' as any, handler as any);
+  useEffect(() => {
+    if (sessionId) {
+      getSession(sessionId).then((session) => {
+        setMessages(session.messages);
+      });
+    } else {
+      setMessages([]);
+    }
   }, [sessionId]);
 
-  useEffect(()=>{
+  useEffect(() => {
     if (!messages.length) return;
     const persist = async () => {
-      const saved = await saveSession({ id: sessionId || undefined, title: messages[0]?.text?.slice(0, 60) || 'Session', messages });
+      const saved = await saveSession({
+        id: sessionId,
+        title: messages[0]?.text?.slice(0, 60) || "New Session",
+        messages,
+      });
       if (!sessionId) {
-        setSessionId(saved.id);
-        localStorage.setItem('current_session_id', saved.id);
+        navigate(`/session/${saved.id}`, { replace: true });
       }
+      window.dispatchEvent(new Event("session_updated"));
     };
     void persist();
   }, [messages]);
 
-  const handleFiles = async (files: FileList) => {
-    const fileArray = Array.from(files);
-    const opts: IngestionOptions = { knowledgeSet, chunkSize: 800, embedImages: true };
-    for await (const job of ingestFiles(fileArray, opts)) {
-      setJobs((prev) => {
-        const next = prev.filter((j) => j.id !== job.id);
-        next.unshift(job);
-        return next.slice(0, 25);
-      });
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAttachment(null); // Clear previous attachment
+
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const dataUrl = loadEvent.target?.result as string;
+        setAttachment({ name: file.name, url: dataUrl, type: "image" });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      try {
+        const content = await file.text();
+        setAttachment({ name: file.name, content, type: "text" });
+      } catch (err) {
+        console.error("Failed to read file", err);
+      }
     }
-    setAvailableSets(await listKnowledgeSets());
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const onSubmit = async () => {
-    if (!input.trim()) return;
+    const text = input.trim();
+    if (!text && !attachment) return;
     setBusy(true);
-    const userMsg: Message = { id: crypto.randomUUID(), role: "user", text: input };
+
+    let promptText = text;
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text: input, // Keep original input for display
+    };
+
+    if (attachment) {
+      if (attachment.type === "text") {
+        promptText = `Using the following file as context:\n\n--- ${attachment.name} ---\n${attachment.content}\n\n---\n\nMy question is: ${text}`;
+      } else if (attachment.type === "image") {
+        userMsg.imageUrl = attachment.url;
+      }
+      setAttachment(null);
+    }
+
     setMessages((m) => [...m, userMsg]);
     setInput("");
+
     try {
       if (useOllama) {
-        const res = await ollamaGenerate("llama2", userMsg.text);
-        const assistantMsg: Message = { id: crypto.randomUUID(), role: "assistant", text: "" };
+        const res = await ollamaGenerate("llama2", promptText);
+        const assistantMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: "",
+        };
         setMessages((m) => [...m, assistantMsg]);
 
         const reader = res.body?.getReader();
@@ -106,7 +145,10 @@ export default function AgentWorkspace() {
               setMessages((m) => {
                 const lastMsg = m[m.length - 1];
                 if (lastMsg.id === assistantMsg.id) {
-                  return [...m.slice(0, -1), { ...lastMsg, text: lastMsg.text + chunk.response }];
+                  return [
+                    ...m.slice(0, -1),
+                    { ...lastMsg, text: lastMsg.text + chunk.response },
+                  ];
                 }
                 return m;
               });
@@ -117,8 +159,19 @@ export default function AgentWorkspace() {
           buffer = lines[lines.length - 1];
         }
       } else {
-        const res = await processQuery({ query: userMsg.text, knowledgeSet, useMemory, useRag, history: messages });
-        const assistant: Message = { id: crypto.randomUUID(), role: "assistant", text: res.text, structured: res.structured };
+        const res = await processQuery({
+          query: promptText,
+          knowledgeSet,
+          useMemory,
+          useRag,
+          history: messages,
+        });
+        const assistant: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: res.text,
+          structured: res.structured,
+        };
         setMessages((m) => [...m, assistant]);
       }
     } finally {
@@ -133,15 +186,11 @@ export default function AgentWorkspace() {
           <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-cyan-50 dark:from-indigo-950/30 dark:to-cyan-950/30">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-xl">
-                <Brain className="size-5 text-primary"/> Agent Workspace
+                <Brain className="size-5 text-primary" /> Agent Workspace
               </CardTitle>
               <button
                 className="text-xs rounded-md border px-2 py-1 hover:bg-accent"
-                onClick={() => {
-                  setMessages([]);
-                  setSessionId("");
-                  localStorage.removeItem('current_session_id');
-                }}
+                onClick={() => navigate("/")}
               >
                 New session
               </button>
@@ -151,24 +200,36 @@ export default function AgentWorkspace() {
             <div className="h-[60vh] md:h-[64vh] overflow-y-auto p-4 space-y-4">
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-center text-muted-foreground">
-                  Ask a question or drop files to ground the answer with your knowledge.
+                  Ask a question or attach a file to start.
                 </div>
               ) : (
                 messages.map((m) => (
-                  <div key={m.id} className={cn("flex", m.role === "assistant" ? "justify-start" : "justify-end")}> 
-                    <div className={cn("max-w-[85%] rounded-lg px-4 py-3 text-sm shadow", m.role === "assistant" ? "bg-accent/60" : "bg-primary text-primary-foreground")}
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "flex",
+                      m.role === "assistant" ? "justify-start" : "justify-end"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-lg px-4 py-3 shadow",
+                        m.role === "assistant"
+                          ? "bg-accent/60"
+                          : "bg-primary text-primary-foreground"
+                      )}
                     >
+                      {m.imageUrl && (
+                        <img
+                          src={m.imageUrl}
+                          alt="User upload"
+                          className="mb-2 rounded-md max-h-60"
+                        />
+                      )}
                       <div className="whitespace-pre-wrap">{m.text}</div>
                       {m.structured ? (
                         <div className="mt-3 rounded-md border bg-background p-2 text-foreground">
                           <JsonRenderer data={m.structured} />
-                        </div>
-                      ) : null}
-                      {m.role === 'assistant' ? (
-                        <div className="mt-2 flex gap-2 text-xs opacity-80">
-                          <span>Feedback:</span>
-                          <button className="rounded border px-1" onClick={()=>window.dispatchEvent(new CustomEvent('feedback_click', { detail: { messageId: m.id, rating: 'up' } }))}>👍</button>
-                          <button className="rounded border px-1" onClick={()=>window.dispatchEvent(new CustomEvent('feedback_click', { detail: { messageId: m.id, rating: 'down' } }))}>👎</button>
                         </div>
                       ) : null}
                     </div>
@@ -177,28 +238,57 @@ export default function AgentWorkspace() {
               )}
             </div>
             <div className="border-t p-3">
-              <div className="flex items-end gap-2">
+              {attachment && (
+                <div className="mb-2 flex items-center justify-between rounded-md border bg-accent/50 p-2 text-sm">
+                  <div className="flex items-center gap-2 truncate">
+                    <File className="size-4 flex-shrink-0" />
+                    <span className="truncate">Attached: {attachment.name}</span>
+                  </div>
+                  <button
+                    onClick={() => setAttachment(null)}
+                    className="p-1 rounded-md hover:bg-destructive/20 hover:text-destructive"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2">
                 <div className="flex-1">
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type your message..."
                     rows={3}
-                    className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        onSubmit();
+                      }
+                    }}
                   />
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <button
-                      className="inline-flex items-center gap-1 hover:text-foreground"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className="size-3.5"/> Attach files
-                    </button>
-                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-                  </div>
                 </div>
-                <Button disabled={busy} onClick={onSubmit} className="shrink-0">
-                  <Send className="mr-2"/> Send
-                </Button>
+                <div className="m-0 flex flex-col gap-3 items-center justify-center">
+                  <button
+                    className="inline-flex items-center gap-1 hover:text-foreground border-4 rounded p-1 hover:bg-blue-950 text-sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Paperclip className="size-4" /> Attach file
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                  <Button
+                    disabled={busy}
+                    onClick={onSubmit}
+                    className="pr-4 pl-4 text-md"
+                  >
+                    <Send className="mr-2" /> Send
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -207,7 +297,9 @@ export default function AgentWorkspace() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><Database className="size-4"/> Active Context</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Database className="size-4" /> Active Context
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <ToggleRow
@@ -229,38 +321,24 @@ export default function AgentWorkspace() {
                 onToggle={() => setUseOllama((v) => !v)}
               />
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Knowledge Set</div>
+                <div className="text-xs text-muted-foreground mb-1">
+                  Knowledge Set
+                </div>
                 <select
                   value={knowledgeSet}
                   onChange={(e) => setKnowledgeSet(e.target.value)}
                   className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
                 >
-                  {["default", ...availableSets.filter((s) => s !== "default")].map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                  {[ 
+                    "default",
+                    ...availableSets.filter((s) => s !== "default"),
+                  ].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
                   ))}
                 </select>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><Files className="size-4"/> File Insight</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {jobs.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No files ingested yet.</div>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {jobs.map((j) => (
-                    <li key={j.id} className="flex items-center gap-2">
-                      <File className="size-4 text-muted-foreground"/>
-                      <span className="truncate" title={j.name}>{j.name}</span>
-                      <span className={cn("ml-auto rounded px-1.5 py-0.5 text-[10px]", statusStyles(j.status))}>{j.status}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -269,26 +347,17 @@ export default function AgentWorkspace() {
   );
 }
 
-function statusStyles(status: IngestionJob["status"]) {
-  switch (status) {
-    case "queued":
-      return "bg-muted text-foreground/70";
-    case "parsing":
-      return "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200";
-    case "chunking":
-      return "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200";
-    case "embedding":
-      return "bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-200";
-    case "stored":
-      return "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200";
-    case "error":
-      return "bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-200";
-    default:
-      return "bg-muted";
-  }
-}
-
-function ToggleRow({ label, description, enabled, onToggle }: { label: string; description: string; enabled: boolean; onToggle: () => void }) {
+function ToggleRow({
+  label,
+  description,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <button

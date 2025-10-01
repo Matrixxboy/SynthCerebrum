@@ -24,8 +24,10 @@ interface AppConfig {
 
 function ensureDirs(cfg: AppConfig) {
   if (!fs.existsSync(DATA_ROOT)) fs.mkdirSync(DATA_ROOT, { recursive: true });
-  if (!fs.existsSync(cfg.modelsDir)) fs.mkdirSync(cfg.modelsDir, { recursive: true });
-  if (!fs.existsSync(cfg.dataDir)) fs.mkdirSync(cfg.dataDir, { recursive: true });
+  if (!fs.existsSync(cfg.modelsDir))
+    fs.mkdirSync(cfg.modelsDir, { recursive: true });
+  if (!fs.existsSync(cfg.dataDir))
+    fs.mkdirSync(cfg.dataDir, { recursive: true });
 }
 
 function loadConfig(): AppConfig {
@@ -37,7 +39,11 @@ function loadConfig(): AppConfig {
     cfg = {
       modelsDir: path.join(DATA_ROOT, "models"),
       dataDir: path.join(DATA_ROOT, "db"),
-      engine: { threads: Math.max(1, os.cpus()?.length || 4), gpuLayers: 0, quantization: "auto" },
+      engine: {
+        threads: Math.max(1, os.cpus()?.length || 4),
+        gpuLayers: 0,
+        quantization: "auto",
+      },
     };
   }
   ensureDirs(cfg);
@@ -98,19 +104,41 @@ export function createServer() {
       res.status(500).json({ error: e?.message || String(e) });
     }
   });
-      
 
   app.post("/api/ollama/generate", async (req, res) => {
     try {
       const { model, prompt } = req.body || {};
-      if (!model || !prompt) return res.status(400).json({ error: "model and prompt required" });
+      if (!model || !prompt)
+        return res.status(400).json({ error: "model and prompt required" });
       const r = await fetch("http://127.0.0.1:11434/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ model, prompt, stream: true }),
       });
       res.setHeader("Content-Type", "application/octet-stream");
-      r.body?.pipe(res);
+      if (r.body) {
+        // Convert web ReadableStream to Node.js stream
+        const reader = r.body.getReader();
+        const { Writable } = require("stream");
+        const writable = new Writable({
+          write(chunk: any, _encoding: any, callback: any) {
+            res.write(chunk);
+            callback();
+          }
+        });
+        async function pump() {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            writable.write(value);
+          }
+          writable.end();
+          res.end();
+        }
+        pump();
+      } else {
+        res.status(500).json({ error: "No response body" });
+      }
     } catch (e: any) {
       res.status(500).json({ error: e?.message || String(e) });
     }
@@ -119,13 +147,17 @@ export function createServer() {
   // Hugging Face download
   app.post("/api/hf/download", async (req, res) => {
     const { repoId, file, dest = "models" } = req.body || {};
-    if (!repoId || !file) return res.status(400).json({ error: "repoId and file required" });
+    if (!repoId || !file)
+      return res.status(400).json({ error: "repoId and file required" });
     const cfg = loadConfig();
     const destDir = dest === "data" ? cfg.dataDir : cfg.modelsDir;
     const url = `https://huggingface.co/${repoId}/resolve/main/${file}`;
     try {
       const resp = await fetch(url);
-      if (!resp.ok || !resp.body) throw new Error(`Failed to download: ${resp.status} ${resp.statusText}`);
+      if (!resp.ok || !resp.body)
+        throw new Error(
+          `Failed to download: ${resp.status} ${resp.statusText}`,
+        );
       const outPath = path.join(destDir, path.basename(file));
       await fsp.mkdir(path.dirname(outPath), { recursive: true });
       const fileStream = fs.createWriteStream(outPath);
@@ -148,8 +180,12 @@ export function createServer() {
     const destDir = dest === "data" ? cfg.dataDir : cfg.modelsDir;
     try {
       const resp = await fetch(url);
-      if (!resp.ok || !resp.body) throw new Error(`Failed: ${resp.status} ${resp.statusText}`);
-      const outPath = path.join(destDir, filename || path.basename(new URL(url).pathname));
+      if (!resp.ok || !resp.body)
+        throw new Error(`Failed: ${resp.status} ${resp.statusText}`);
+      const outPath = path.join(
+        destDir,
+        filename || path.basename(new URL(url).pathname),
+      );
       await fsp.mkdir(path.dirname(outPath), { recursive: true });
       const fileStream = fs.createWriteStream(outPath);
       await new Promise((resolve, reject) => {
@@ -171,7 +207,8 @@ export function createServer() {
   });
   app.post("/api/db/uploadFile", async (req, res) => {
     const { name, contentBase64 } = req.body || {};
-    if (!name || !contentBase64) return res.status(400).json({ error: "name and contentBase64 required" });
+    if (!name || !contentBase64)
+      return res.status(400).json({ error: "name and contentBase64 required" });
     const cfg = loadConfig();
     const outPath = path.join(cfg.dataDir, path.basename(name));
     const buf = Buffer.from(contentBase64, "base64");
@@ -190,7 +227,12 @@ export function createServer() {
       try {
         const raw = await fsp.readFile(path.join(dir, f), "utf-8");
         const s = JSON.parse(raw);
-        sessions.push({ id: s.id, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt });
+        sessions.push({
+          id: s.id,
+          title: s.title,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        });
       } catch {}
     }
     sessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -212,7 +254,13 @@ export function createServer() {
     const s = req.body || {};
     const id = s.id || randomUUID();
     const now = Date.now();
-    const session = { id, title: s.title || `Session ${new Date().toLocaleString()}}`, messages: s.messages || [], createdAt: s.createdAt || now, updatedAt: now };
+    const session = {
+      id,
+      title: s.title || `Session ${new Date().toLocaleString()}}`,
+      messages: s.messages || [],
+      createdAt: s.createdAt || now,
+      updatedAt: now,
+    };
     const file = path.join(dir, `${id}.json`);
     await fsp.writeFile(file, JSON.stringify(session, null, 2), "utf-8");
     res.json(session);
@@ -229,13 +277,25 @@ export function createServer() {
   // Feedback logging
   app.post("/api/feedback", async (req, res) => {
     const { sessionId, messageId, rating, note } = req.body || {};
-    if (!sessionId || !messageId || !rating) return res.status(400).json({ error: "sessionId, messageId, rating required" });
+    if (!sessionId || !messageId || !rating)
+      return res
+        .status(400)
+        .json({ error: "sessionId, messageId, rating required" });
     const file = path.join(DATA_ROOT, "feedback.json");
     let arr: any[] = [];
     if (fs.existsSync(file)) {
-      try { arr = JSON.parse(await fsp.readFile(file, "utf-8")); } catch {}
+      try {
+        arr = JSON.parse(await fsp.readFile(file, "utf-8"));
+      } catch {}
     }
-    const entry = { id: randomUUID(), sessionId, messageId, rating, note, ts: Date.now() };
+    const entry = {
+      id: randomUUID(),
+      sessionId,
+      messageId,
+      rating,
+      note,
+      ts: Date.now(),
+    };
     arr.push(entry);
     await fsp.writeFile(file, JSON.stringify(arr, null, 2), "utf-8");
     res.json(entry);
