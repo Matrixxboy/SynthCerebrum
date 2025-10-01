@@ -12,8 +12,17 @@
       "id": "ff2007c1-ea04-40ff-b44a-039d49ef385e",
       "role": "user",
       "text": "read this file"
+    },
+    {
+      "id": "8fd40404-9cd3-45cc-9839-ae53238c9d41",
+      "role": "user",
+      "text": "can you read this ",
+      "fileAttachment": {
+        "name": "Rajput Parth Kishan.pdf",
+        "type": "application/pdf"
+      }
     }
   ],
-  "createdAt": 1759316004852,
-  "updatedAt": 1759316004852
+  "createdAt": 1759316188706,
+  "updatedAt": 1759316188706
 }

@@ -12,8 +12,8 @@ import JsonRenderer from "@/components/JsonRenderer";
 import { getSession, saveSession, type ChatMessage } from "@/lib/sessions";
 
 type Attachment =
-  | { name: string; content: string; type: "text" }
-  | { name: string; url: string; type: "image" };
+  | { name: string; content: string; type: string }
+  | { name: string; url: string; type: string };
 
 export default function AgentWorkspace() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -67,19 +67,19 @@ export default function AgentWorkspace() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setAttachment(null); // Clear previous attachment
+    setAttachment(null);
 
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
         const dataUrl = loadEvent.target?.result as string;
-        setAttachment({ name: file.name, url: dataUrl, type: "image" });
+        setAttachment({ name: file.name, url: dataUrl, type: file.type });
       };
       reader.readAsDataURL(file);
     } else {
       try {
         const content = await file.text();
-        setAttachment({ name: file.name, content, type: "text" });
+        setAttachment({ name: file.name, content, type: file.type });
       } catch (err) {
         console.error("Failed to read file", err);
       }
@@ -99,13 +99,14 @@ export default function AgentWorkspace() {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      text: input, // Keep original input for display
+      text: input,
     };
 
     if (attachment) {
-      if (attachment.type === "text") {
+      if ("content" in attachment) { // Text-based file
         promptText = `Using the following file as context:\n\n--- ${attachment.name} ---\n${attachment.content}\n\n---\n\nMy question is: ${text}`;
-      } else if (attachment.type === "image") {
+        userMsg.fileAttachment = { name: attachment.name, type: attachment.type };
+      } else if ("url" in attachment) { // Image file
         userMsg.imageUrl = attachment.url;
       }
       setAttachment(null);
@@ -225,6 +226,14 @@ export default function AgentWorkspace() {
                           alt="User upload"
                           className="mb-2 rounded-md max-h-60"
                         />
+                      )}
+                      {m.fileAttachment && (
+                        <div className="mb-2 flex items-center gap-2 rounded-md border bg-background/30 p-2">
+                          <File className="size-6 text-foreground/70" />
+                          <div className="truncate text-sm">
+                            {m.fileAttachment.name}
+                          </div>
+                        </div>
                       )}
                       <div className="whitespace-pre-wrap">{m.text}</div>
                       {m.structured ? (
